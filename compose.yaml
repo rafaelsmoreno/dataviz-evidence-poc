@@ -1,0 +1,18 @@
+services:
+  evidence:
+    image: node:20-slim
+    container_name: evidence_dev
+    volumes:
+      - .:/usr/src/app
+    working_dir: /usr/src/app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    command: >
+      sh -c "if [ ! -f package.json ]; then
+               npx degit evidence-dev/template . && npm install;
+             fi;
+             npm run sources && npm run dev -- --host 0.0.0.0"
+    stdin_open: true
+    tty: true
