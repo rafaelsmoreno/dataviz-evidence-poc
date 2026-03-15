@@ -36,7 +36,7 @@ select * from ${macro} order by year desc limit 1
 
 ## Historical Trends
 
-<DateRange name=year_range title="Year range" start=2000 end=2025/>
+<DateRange name=year_range title="Year range" start="2000-01-01" end="2025-12-31"/>
 
 <ButtonGroup name=gdp_view title="GDP view">
     <ButtonGroupItem valueLabel="Total GDP (USD bn)" value="gdp_billion_usd"    default/>
