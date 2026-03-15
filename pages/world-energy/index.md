@@ -1,5 +1,6 @@
 ---
 title: World Energy Mix
+sidebar_position: 2
 ---
 
 ```sql global
@@ -36,7 +37,7 @@ where year >= year('${inputs.year_range.start}')
   and year <= year('${inputs.year_range.end}')
 ```
 
-{#if inputs.view_mode === 'shares'}
+{#if inputs.view_mode.value === 'shares'}
 <AreaChart
   data={global_filtered}
   x=year
@@ -90,7 +91,7 @@ where year >= year('${inputs.year_range.start}')
 
 ```sql country_filtered
 select * from ${timeseries}
-where country in ${inputs.countries}
+where country in ${inputs.countries.value}
   and year >= year('${inputs.year_range.start}')
   and year <= year('${inputs.year_range.end}')
 ```
@@ -98,16 +99,16 @@ where country in ${inputs.countries}
 <LineChart
   data={country_filtered}
   x=year
-  y={inputs.country_metric}
+  y={inputs.country_metric.value}
   series=country
-  title="{inputs.country_metric} by Country"
-  yAxisTitle={inputs.country_metric}
+  title="{inputs.country_metric.value} by Country"
+  yAxisTitle={inputs.country_metric.value}
   markers=false
 />
 
 ---
 
-## Top 20 Countries by Renewable Share (Latest Year)
+## Top Countries by Renewable Share
 
 <Slider name=min_twh title="Min electricity generation (TWh)" min=10 max=500 defaultValue=10 step=10/>
 
@@ -121,7 +122,7 @@ order by renewables_pct desc
   data={renewables_filtered}
   x=country
   y=renewables_pct
-  title="Renewable Share of Electricity (%) — Top Countries"
+  title="Renewable Share of Electricity (%) — Latest Year"
   yAxisTitle="%"
   swapXY=true
   labels=true
@@ -129,7 +130,7 @@ order by renewables_pct desc
 
 ---
 
-## Current Energy Mix by Country
+## Current Mix by Country
 
 <Dropdown
   data={country_mix}
@@ -141,16 +142,12 @@ order by renewables_pct desc
 
 ```sql selected_mix
 select * from ${country_mix}
-where country = '${inputs.selected_country}'
+where country = '${inputs.selected_country.value}'
 ```
 
 <Grid cols=2>
-<BigValue data={selected_mix} value=total_renewables_pct  title="Renewables %"    fmt=num1/>
-<BigValue data={selected_mix} value=total_fossil_pct      title="Fossil Fuels %"  fmt=num1/>
-<BigValue data={selected_mix} value=nuclear_pct           title="Nuclear %"       fmt=num1/>
+<BigValue data={selected_mix} value=total_renewables_pct  title="Renewables %"     fmt=num1/>
+<BigValue data={selected_mix} value=total_fossil_pct      title="Fossil Fuels %"   fmt=num1/>
+<BigValue data={selected_mix} value=nuclear_pct           title="Nuclear %"        fmt=num1/>
 <BigValue data={selected_mix} value=electricity_twh       title="Generation (TWh)" fmt=num0/>
 </Grid>
-
----
-
-> [← Overview](/) | [Brazil Economy →](/brazil-economy)

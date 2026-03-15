@@ -1,5 +1,6 @@
 ---
 title: Brazil Economy
+sidebar_position: 3
 ---
 
 ```sql macro
@@ -26,8 +27,8 @@ select * from ${macro} order by year desc limit 1
 </Grid>
 
 <Grid cols=3>
-<BigValue data={latest} value=unemployment_pct     title="Unemployment %"      fmt=pct1/>
-<BigValue data={latest} value=exports_billion_usd  title="Exports (USD bn)"    fmt=num1/>
+<BigValue data={latest} value=unemployment_pct          title="Unemployment %"       fmt=pct1/>
+<BigValue data={latest} value=exports_billion_usd       title="Exports (USD bn)"     fmt=num1/>
 <BigValue data={latest} value=trade_balance_billion_usd title="Trade Balance (USD bn)" fmt=num1/>
 </Grid>
 
@@ -51,8 +52,8 @@ where year >= year('${inputs.year_range.start}')
 <LineChart
   data={macro_filtered}
   x=year
-  y={inputs.gdp_view}
-  title="Brazil GDP — {inputs.gdp_view}"
+  y={inputs.gdp_view.value}
+  title="Brazil GDP — {inputs.gdp_view.value}"
   yAxisTitle="USD"
   markers=true
 />
@@ -114,7 +115,3 @@ where year >= year('${inputs.year_range.start}')
   title="Brazil Economic Indicators"
   search=true
 />
-
----
-
-> [← World Energy](/world-energy) | [NYC Taxi →](/)

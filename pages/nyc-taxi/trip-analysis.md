@@ -1,5 +1,6 @@
 ---
 title: Trip Analysis
+sidebar_position: 3
 ---
 
 ```sql dist
@@ -78,7 +79,7 @@ where distance_bucket_miles <= ${inputs.max_distance}
 
 ```sql scatter_filtered
 select * from ${scatter}
-where (payment_type_name = '${inputs.payment_scatter}' or '${inputs.payment_scatter}' = 'All')
+where (payment_type_name = '${inputs.payment_scatter.value}' or '${inputs.payment_scatter.value}' = 'All')
   and fare_amount <= ${inputs.max_fare}
 ```
 
@@ -115,7 +116,7 @@ limit ${inputs.top_n}
   data={zones_filtered}
   x=pickup_location_id
   y=trips
-  title="Top {inputs.top_n} Pickup Zones"
+  title="Top {inputs.top_n.value} Pickup Zones"
   xAxisTitle="Zone ID"
   yAxisTitle="Trips"
   labels=true
@@ -152,7 +153,3 @@ limit ${inputs.top_n}
   labels=true
 />
 </Grid>
-
----
-
-> [← Overview](/) | [← Time Patterns](/time-patterns)

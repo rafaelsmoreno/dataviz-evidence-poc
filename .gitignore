@@ -8,3 +8,9 @@ static/data
 .vscode/settings.json
 .env
 .evidence/meta
+
+# Raw data files — downloaded at runtime by init_db.sh
+sources/nyc_taxi/raw/
+sources/world_energy/*.csv
+sources/brazil_economy/*.csv
+sources/nyc_taxi/*.db
