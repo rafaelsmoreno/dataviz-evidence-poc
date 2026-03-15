@@ -1,7 +1,27 @@
 services:
+
+  # ── 1. DuckDB initializer ──────────────────────────────────────────────────
+  # Runs once: downloads NYC Taxi Jan 2024 Parquet from TLC S3 and builds
+  # a persistent DuckDB file at ./sources/nyc_taxi/nyc_taxi.db
+  # On subsequent runs it detects the file already exists and exits immediately.
+  duckdb-init:
+    image: datacatering/duckdb:v1.2.0
+    container_name: duckdb_init
+    volumes:
+      - ./sources/nyc_taxi:/data          # DB file lands here, Evidence reads it
+      - ./scripts:/scripts
+    command: sh /scripts/init_db.sh
+    restart: "no"
+
+  # ── 2. Evidence dev server ─────────────────────────────────────────────────
+  # Bootstraps the Evidence template on first run, then starts the dev server.
+  # Depends on duckdb-init so the DB file is ready before sources are ingested.
   evidence:
     image: node:20-slim
     container_name: evidence_dev
+    depends_on:
+      duckdb-init:
+        condition: service_completed_successfully
     volumes:
       - .:/usr/src/app
     working_dir: /usr/src/app
@@ -10,9 +30,28 @@ services:
     environment:
       - NODE_ENV=development
     command: >
-      sh -c "if [ ! -f package.json ]; then
-               npx degit evidence-dev/template . && npm install;
-             fi;
-             npm run sources && npm run dev -- --host 0.0.0.0"
+      sh -c "
+        set -e;
+
+        # ── Bootstrap Evidence template on first run ──────────────────────
+        if [ ! -f package.json ]; then
+          echo '[evidence] Bootstrapping Evidence template...';
+          npx --yes degit evidence-dev/template .tmp_template;
+          cp -r .tmp_template/. .;
+          rm -rf .tmp_template;
+          npm install;
+        fi;
+
+        # ── Overlay our custom sources & pages ───────────────────────────
+        # (already present in the volume mount — nothing extra needed)
+
+        # ── Run sources to ingest DuckDB into Evidence's Parquet cache ───
+        echo '[evidence] Running npm run sources...';
+        npm run sources;
+
+        # ── Start dev server ─────────────────────────────────────────────
+        echo '[evidence] Starting dev server on :3000 ...';
+        npm run dev -- --host 0.0.0.0
+      "
     stdin_open: true
     tty: true

@@ -1,0 +1,5 @@
+# Evidence DuckDB data source connection
+name: nyc_taxi
+type: duckdb
+options:
+  filename: nyc_taxi.db
