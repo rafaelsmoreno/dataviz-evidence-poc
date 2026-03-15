@@ -1,18 +1,50 @@
 services:
+
+  # ── 1. Data initializer ────────────────────────────────────────────────────
+  # Downloads the NYC Taxi Jan 2024 Parquet file to sources/nyc_taxi/raw/.
+  # Runs once; skips download if file already exists.
+  # Evidence's in-memory DuckDB reads this file directly via read_parquet().
+  duckdb-init:
+    image: datacatering/duckdb:v1.2.0
+    container_name: duckdb_init
+    entrypoint: ["/bin/sh", "/scripts/init_db.sh"]
+    volumes:
+      - ./sources/nyc_taxi:/data/nyc_taxi
+      - ./sources/world_energy:/data/world_energy
+      - ./sources/brazil_economy:/data/brazil_economy
+      - ./scripts:/scripts
+    command: []
+    restart: "no"
+
+  # ── 2. Evidence dev server ─────────────────────────────────────────────────
+  # Waits for Parquet download, then runs sources + dev server.
+  # DuckDB runs in-memory; yellow_taxi.sql reads the Parquet via read_parquet().
   evidence:
     image: node:20-slim
     container_name: evidence_dev
+    depends_on:
+      duckdb-init:
+        condition: service_completed_successfully
     volumes:
       - .:/usr/src/app
     working_dir: /usr/src/app
     ports:
-      - "3000:3000"
+      - "3777:3000"
     environment:
       - NODE_ENV=development
+      - NODE_OPTIONS=--max-old-space-size=4096
     command: >
-      sh -c "if [ ! -f package.json ]; then
-               npx degit evidence-dev/template . && npm install;
-             fi;
-             npm run sources && npm run dev -- --host 0.0.0.0"
-    stdin_open: true
-    tty: true
+      sh -c "
+        set -e;
+
+        if [ ! -d node_modules ]; then
+          echo '[evidence] Installing npm dependencies...';
+          npm install;
+        fi;
+
+        echo '[evidence] Running npm run sources...';
+        npm run sources;
+
+        echo '[evidence] Starting dev server on :3000...';
+        npm run dev -- --host 0.0.0.0
+      "

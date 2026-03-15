@@ -1,0 +1,6 @@
+# Evidence DuckDB source — in-memory, reads Parquet directly via read_parquet()
+# The .db file approach was dropped: cross-container path resolution was
+# unreliable. Source SQL queries use read_parquet() with a path relative
+# to the Evidence working directory (/usr/src/app).
+name: nyc_taxi
+type: duckdb
