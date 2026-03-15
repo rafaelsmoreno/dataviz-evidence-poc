@@ -70,9 +70,9 @@ where date >= '${inputs.date_filter.start}'
 <LineChart
   data={daily_filtered}
   x=date
-  y={inputs.daily_metric.value}
-  title="Daily {inputs.daily_metric.value} — {inputs.date_filter.start} to {inputs.date_filter.end}"
-  yAxisTitle={inputs.daily_metric.value}
+  y={inputs.daily_metric}
+  title="Daily {inputs.daily_metric} — {inputs.date_filter.start} to {inputs.date_filter.end}"
+  yAxisTitle={inputs.daily_metric}
   markers=true
 />
 

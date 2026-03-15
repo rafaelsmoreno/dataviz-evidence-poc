@@ -116,7 +116,7 @@ limit ${inputs.top_n}
   data={zones_filtered}
   x=pickup_location_id
   y=trips
-  title="Top {inputs.top_n.value} Pickup Zones"
+  title="Top {inputs.top_n} Pickup Zones"
   xAxisTitle="Zone ID"
   yAxisTitle="Trips"
   labels=true

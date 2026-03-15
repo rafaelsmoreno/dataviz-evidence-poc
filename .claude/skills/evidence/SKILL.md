@@ -5,218 +5,294 @@ description: Evidence BI framework reference — SQL-driven pages, chart compone
 
 # Evidence Framework Reference
 
+> All rules in this file are verified against official Evidence.dev documentation.
+> Do not change access patterns without re-verifying against docs.
+
+---
+
 ## Project Structure
 
 ```
-pages/                        # Markdown pages — filesystem = URL routing
-  index.md                    # Root homepage (/), serves as dataset portal
-  dataset-name/               # Subdirectory = sidebar group with that name
-    index.md                  # Landing page for the group (/dataset-name/)
+pages/                        # Filesystem = URL routing
+  index.md                    # Root homepage (/)
+  dataset-name/               # Subdirectory → sidebar group
+    index.md                  # Group landing page (/dataset-name/)
     sub-page.md               # Subpage (/dataset-name/sub-page)
-sources/                      # Data source connections
+sources/                      # Data source definitions
   my_source/
     connection.yaml           # Connection config
-    query.sql                 # Source query — pre-materialized to Parquet
+    query.sql                 # Source query → pre-materialized Parquet
 partials/                     # Reusable markdown snippets
-static/                       # Static assets (images, etc.)
-evidence.plugins.yaml         # Plugin and theme config
+static/                       # Images and static assets
 ```
 
-### Sidebar Navigation
-- Subdirectory structure creates grouped sections in the sidebar automatically
-- `sidebar_position: N` in frontmatter controls order within a group
-- `title` in frontmatter sets the sidebar label and page heading
-- Directory group name comes from the `title` in its `index.md`
+### Sidebar navigation
+- Subdirectories auto-create grouped sidebar sections
+- `title:` frontmatter = sidebar label and page heading
+- `sidebar_position: N` = order within a group (ascending)
+- A directory's group name comes from the `title` in its `index.md`
 
-```markdown
 ---
-title: NYC Yellow Taxi   # ← becomes the sidebar group label
-sidebar_position: 1      # ← group order in sidebar
----
-```
 
-## Page Authoring
+## CRITICAL: Input Access Patterns
 
-Pages are Markdown files with SQL code blocks:
-````markdown
-```sql orders
-select * from needful_things.orders
-where order_date >= '2024-01-01'
-```
+This is the most common source of page errors. Each component type has a
+**different** access pattern. They are NOT interchangeable.
 
-Total orders: <Value data={orders} column="order_count"/>
-````
+### Quick reference table
 
-SQL blocks: ` ```sql query_name ` — the name becomes a referenceable variable.
+| Component | Access in SQL | Access in props/titles | Notes |
+|---|---|---|---|
+| **Dropdown** (single) | `'${inputs.x.value}'` | `{inputs.x.value}` | `.value` required |
+| **Dropdown** (multi) | `IN ${inputs.x.value}` | `{inputs.x.value}` | No quotes around `${}` |
+| **ButtonGroup** | `'${inputs.x}'` | `{inputs.x}` | **NO `.value`** |
+| **DateRange** | `'${inputs.x.start}'` / `'${inputs.x.end}'` | `{inputs.x.start}` | **NO `.value`** |
+| **Slider** | `${inputs.x}` | `{inputs.x}` | **NO `.value`**, no quotes |
 
-## CRITICAL: Input `.value` Rules
-
-**This is the most common source of errors.** Every input component stores its
-selected value in a `.value` property. Always use `.value` when referencing
-inputs in SQL strings or component props.
-
-### Single-select inputs (Dropdown, ButtonGroup)
+### Dropdown (single-select)
 
 ```markdown
-<!-- SQL interpolation — MUST use .value -->
-where category = '${inputs.my_dropdown.value}'
+<Dropdown data={q} name=my_filter value=category_col title="Category"/>
 
-<!-- Component prop — MUST use .value -->
-<LineChart y={inputs.my_metric.value} />
-<BarChart title="Results for {inputs.my_dropdown.value}" />
+<!-- SQL -->
+where category = '${inputs.my_filter.value}'
 
-<!-- If/else conditions — MUST use .value -->
-{#if inputs.view_mode.value === 'shares'}
+<!-- Component prop -->
+<LineChart y={inputs.my_filter.value}/>
+
+<!-- If/else -->
+{#if inputs.my_filter.value === 'foo'}
 ```
 
-### Multi-select Dropdown (`multiple=true`)
+### Dropdown (multi-select, `multiple=true`)
 
 ```markdown
-<!-- SQL IN clause — use .value, NO quotes around ${} -->
-where category IN ${inputs.my_multi.value}
+<Dropdown data={q} name=multi_filter value=col multiple=true selectAllByDefault=true/>
+
+<!-- SQL — IN clause, NO quotes around ${} -->
+where col IN ${inputs.multi_filter.value}
 
 <!-- WRONG — produces "[object Object]" error -->
-where category IN ${inputs.my_multi}        ← missing .value
-where category IN '${inputs.my_multi.value}' ← wrong quotes
+where col IN '${inputs.multi_filter.value}'   ← extra quotes
+where col IN ${inputs.multi_filter}           ← missing .value
 ```
 
-### DateRange inputs
+Multi-select `.value` renders as a SQL tuple: `('A','B','C')`.
+
+### ButtonGroup
 
 ```markdown
-<!-- DateRange uses .start and .end — NOT .value -->
-where date >= '${inputs.date_filter.start}'
-  and date <= '${inputs.date_filter.end}'
+<ButtonGroup name=metric title="Metric">
+    <ButtonGroupItem valueLabel="Trips" value="trips" default/>
+    <ButtonGroupItem valueLabel="Revenue" value="revenue"/>
+</ButtonGroup>
+
+<!-- SQL -->
+where col = '${inputs.metric}'
+
+<!-- Component prop — NO .value -->
+<LineChart y={inputs.metric} title="Chart: {inputs.metric}"/>
+
+<!-- If/else — NO .value -->
+{#if inputs.metric === 'trips'}
 ```
 
-### Slider inputs
+### DateRange
 
 ```markdown
-<!-- Slider returns a raw number — no .value needed in SQL -->
-where trip_distance <= ${inputs.max_distance}
+<DateRange name=dr start=2024-01-01 end=2024-12-31/>
+
+<!-- SQL on DATE/TIMESTAMP column — correct -->
+where order_date BETWEEN '${inputs.dr.start}' AND '${inputs.dr.end}'
+
+<!-- SQL on INTEGER year column — MUST cast -->
+where year >= YEAR(CAST('${inputs.dr.start}' AS DATE))
+  and year <= YEAR(CAST('${inputs.dr.end}' AS DATE))
+
+<!-- WRONG for integer year columns -->
+where year >= '${inputs.dr.start}'            ← string vs int
+where year >= year('${inputs.dr.start}')      ← year() needs DATE, not string
+```
+
+`.start` and `.end` return `YYYY-MM-DD` strings. When filtering an INTEGER
+`year` column, you must extract the year with `YEAR(CAST(... AS DATE))`.
+
+### Slider
+
+```markdown
+<Slider name=top_n min=5 max=30 defaultValue=15 step=5/>
+
+<!-- SQL — no .value, no quotes (it's a number) -->
 limit ${inputs.top_n}
+where sales >= ${inputs.top_n}
+
+<!-- Component prop — no .value -->
+title="Top {inputs.top_n} items"
 ```
 
-### Summary table
-
-| Component    | SQL usage                          | Prop usage                  |
-|---|---|---|
-| Dropdown     | `'${inputs.x.value}'`              | `{inputs.x.value}`          |
-| Dropdown multi | `IN ${inputs.x.value}`           | `{inputs.x.value}`          |
-| ButtonGroup  | `'${inputs.x.value}'`              | `{inputs.x.value}`          |
-| DateRange    | `'${inputs.x.start}'`              | `{inputs.x.start}`          |
-| Slider       | `${inputs.x}` (no .value)          | `{inputs.x}`                |
-
-## Built-in Components
-
-### Charts
-- `<BarChart data={query} x=category y=value/>` — vertical bars
-- `<LineChart data={query} x=date y=value series=group/>` — time series
-- `<AreaChart data={query} x=date y={["col1","col2"]}/>` — stacked/filled
-- `<ScatterPlot data={query} x=x_col y=y_col series=group opacity=0.5/>` — correlation
-- `<Heatmap data={query} x=hour y=day value=trips/>` — 2D heatmap
-- `<FunnelChart>` — conversion funnels
-- `<Histogram data={query} x=value/>` — distribution
-
-### Maps
-- `<PointMap data={query} lat=lat long=lon value=metric pointName=label/>`
-  - Requires `lat` and `long` columns with WGS84 decimal degrees
-  - `value` column determines point color (scalar or categorical)
-  - `startingLat`, `startingLong`, `startingZoom` set initial viewport
-  - `tooltipType=hover` or `click`
-  - `colorPalette={['#color1','#color2',...]}` for custom scale
-- `<BubbleMap>` — sized bubbles on map
-- `<AreaMap>` — choropleth (requires GeoJSON)
-
-### Tables & Values
-- `<DataTable data={query} search=true/>` — sortable, searchable, paginated
-- `<BigValue data={query} value=col fmt=usd0 title="Label" agg=sum/>`
-- `<Value data={query} column=col/>` — inline single value
-
-### Inputs (interactive filters)
-- `<Dropdown data={query} name=x value=col title="Label"/>`
-- `<Dropdown ... multiple=true selectAllByDefault=true/>` — multi-select
-- `<DropdownOption value="val" valueLabel="Label"/>` — hardcoded options
-- `<ButtonGroup name=x><ButtonGroupItem valueLabel="Label" value="val" default/></ButtonGroup>`
-- `<DateRange name=x start=2024-01-01 end=2024-12-31/>`
-- `<Slider name=x min=0 max=100 defaultValue=50 step=5/>`
-- `<TextInput name=x/>`
-
-### Layout
-- `<Grid cols=3>` — responsive grid
-- `<BigLink href="/path">## Title\nDescription</BigLink>` — card link
-- `<Tabs>` / `<Tab label="Tab 1">` — tabbed content
-- `<Alert status="info">` — callout boxes
-
-## Component Props — Common Patterns
-
-```markdown
-<!-- Dynamic y axis from ButtonGroup -->
-<LineChart data={q} x=date y={inputs.metric.value}/>
-
-<!-- Multi-line chart -->
-<LineChart data={q} x=date y={["col1","col2","col3"]}/>
-
-<!-- Conditional chart with if/else -->
-{#if inputs.view.value === 'pct'}
-<AreaChart data={q} x=year y=share_pct/>
-{:else}
-<AreaChart data={q} x=year y=absolute_twh/>
-{/if}
-
-<!-- BigValue with aggregation -->
-<BigValue data={q} value=trips fmt=num0 agg=sum/>
-```
+---
 
 ## Source SQL vs Page SQL
 
 | | Source SQL (`sources/name/query.sql`) | Page SQL (` ```sql name ``` `) |
 |---|---|---|
-| Runs at | `npm run sources` (build time) | Browser (DuckDB-WASM, client-side) |
-| Input to | Evidence Parquet cache | In-memory query over cached Parquet |
-| Can reference | Raw files via `read_parquet()`, `read_csv()` | Source results via `source_name.query_name` or `${other_query}` |
-| Can use inputs | No | Yes — `${inputs.x.value}` |
-| Row limit | Unlimited (runs in Node) | Keep small — all rows sent to browser |
+| Runs at | `npm run sources` (build/server time) | Browser (DuckDB-WASM, client-side) |
+| Output | Evidence Parquet cache | In-memory query over cached Parquet |
+| Can reference | Raw files via `read_parquet()`, `read_csv()` | Source results via `source_name.query` or `${other_query}` |
+| Can use `inputs.` | **No** | Yes |
+| Row limit | Unlimited | Keep small — all rows sent to browser |
+| Cross-source JOINs | **No** — each source is isolated | Yes — via page SQL `JOIN` |
 
-**Source SQL must aggregate.** Never load raw 1M+ row tables into a source
-query — Evidence ships the entire result to the browser as Parquet. Always
-`GROUP BY` or `LIMIT` in source queries. Use `USING SAMPLE N ROWS` only for
-scatter plots where sampling is intentional.
+**Source SQL must aggregate.** Never return raw 1M+ row tables. Always
+`GROUP BY` or `LIMIT`. The entire result is shipped to the browser as Parquet.
 
-## DuckDB Source Connection
+### read_parquet() path in source SQL
 
-```yaml
-# sources/my_source/connection.yaml
-name: my_source
-type: duckdb
-# No filename = in-memory DuckDB. Reads files via read_parquet()/read_csv().
-```
+Use paths **relative to the Evidence working directory**, not container paths:
 
-Source queries reference files relative to the Evidence working directory:
 ```sql
--- sources/my_source/my_query.sql
-SELECT * FROM read_parquet('sources/my_source/raw/data.parquet')
-WHERE ...
-GROUP BY ...
+-- CORRECT
+FROM read_parquet('sources/nyc_taxi/raw/data.parquet')
+FROM read_csv('sources/brazil_economy/gdp_usd.csv', auto_detect=true)
+
+-- WRONG — breaks when opened by a different process
+FROM read_parquet('/data/raw/data.parquet')          ← absolute container path
+FROM read_parquet('/usr/src/app/sources/...')        ← absolute path
 ```
 
-Cross-source references in source SQL **do not work** — each source runs
-in its own DuckDB instance. Reference other sources only in page SQL.
+### Query chaining (page SQL only)
 
-## Development
+```sql
+```sql base_query
+select * from source_name.table
+```
 
-- `npm run dev` — hot reload dev server on :3000
-- `npm run sources` — re-run all source queries, rebuild Parquet cache
-- `npm run build` — static site build
-- Page edits hot-reload instantly; source SQL changes require `npm run sources`
+```sql filtered
+select * from ${base_query}
+where col = '${inputs.x.value}'
+```
+```
 
-## Common Pitfalls — Do Not Repeat
+DuckDB subquery alias is optional. Circular references are blocked by Evidence.
+Cross-page query references are **not possible** — use `/queries/` SQL files for shared logic.
 
-1. **Missing `.value`** — always `inputs.x.value` for Dropdown/ButtonGroup in SQL and props
-2. **Multi-select IN clause** — `IN ${inputs.x.value}`, never `IN '${inputs.x.value}'`
-3. **Cross-source in source SQL** — source queries cannot reference other sources; join in page SQL or combine in a single source query
-4. **Large source result sets** — aggregate in SQL; never ship raw rows to browser
-5. **`read_parquet()` path in source SQL** — use path relative to Evidence working dir (`sources/name/raw/file.parquet`), not container-absolute paths
-6. **DuckDB view with absolute paths** — views referencing `/data/raw/...` break when opened by a different container/process; use relative paths or in-memory DuckDB with direct `read_parquet()` in each source query
-7. **`USING SAMPLE` after `WHERE`** — wrong DuckDB syntax; wrap in subquery: `FROM (SELECT * FROM t WHERE ...) USING SAMPLE N ROWS`
-8. **Component casing** — Evidence components use PascalCase (`<BarChart>`, not `<barchart>`)
-9. **Sidebar grouping** — use subdirectories under `pages/`; `index.md` in a subdir = group landing page; `sidebar_position` and `title` frontmatter control order and label
+---
+
+## DuckDB Browser Dialect Notes
+
+Evidence page queries run in DuckDB-WASM. Avoid:
+
+- `year('2024-01-01')` — `YEAR()` needs a `DATE` type, not a string. Use `YEAR(CAST('...' AS DATE))`
+- `USING SAMPLE N ROWS` after `WHERE` — wrong DuckDB syntax. Wrap in subquery:
+  ```sql
+  FROM (SELECT * FROM t WHERE ...) USING SAMPLE 5000 ROWS
+  ```
+- Very large result sets — all rows are sent to the browser. Aggregate in SQL.
+
+---
+
+## Components
+
+### Charts — common props
+
+```markdown
+<LineChart data={query} x=date_col y=value_col/>
+<BarChart  data={query} x=category  y=sales series=group labels=true/>
+<AreaChart data={query} x=year y={["col1","col2","col3"]}/>
+<ScatterPlot data={query} x=distance y=fare series=payment_type opacity=0.5/>
+<Heatmap data={query} x=hour y=day_name value=trips/>
+```
+
+- Column name props are **unquoted bare values**: `x=month` not `x="month"`
+- Multi-y arrays use quoted strings: `y={["sales","orders"]}`
+- Dynamic y from ButtonGroup: `y={inputs.metric}` (no `.value`)
+- Dynamic y from Dropdown: `y={inputs.metric.value}`
+- `data={query}` always needs curly braces
+
+### Maps
+
+```markdown
+<PointMap
+    data={locations}
+    lat=lat_col
+    long=lon_col          ← prop is "long" (4 chars), NOT "lon"
+    value=metric_col
+    pointName=label_col
+    startingLat=40.71
+    startingLong=-74.00
+    startingZoom=11
+    height=500
+    tooltipType=hover
+/>
+```
+
+The `long=` prop takes the **column name** as its value. If your column is
+named `lon`, write `long=lon`. If named `longitude`, write `long=longitude`.
+
+### BigValue — aggregation must be in SQL
+
+`agg=` is **not a valid BigValue prop** — it is silently ignored.
+
+```markdown
+<!-- WRONG — agg= does nothing -->
+<BigValue data={raw_query} value=sales agg=sum/>
+
+<!-- CORRECT — aggregate in SQL first -->
+```sql totals
+select sum(sales) as total_sales, avg(price) as avg_price
+from ${raw_query}
+```
+<BigValue data={totals} value=total_sales fmt=usd0/>
+<BigValue data={totals} value=avg_price fmt=usd2/>
+```
+
+### Layout
+
+```markdown
+<Grid cols=3> ... </Grid>
+<BigLink href="/path">## Title\nDescription</BigLink>
+<DataTable data={q} search=true/>
+```
+
+---
+
+## Sidebar Grouping (page organisation)
+
+```
+pages/
+├── index.md                     ← portal page (title = site root label)
+├── nyc-taxi/
+│   ├── index.md                 ← title: "NYC Yellow Taxi" → group label
+│   ├── time-patterns.md         ← sidebar_position: 2
+│   └── trip-analysis.md         ← sidebar_position: 3
+└── world-energy/
+    └── index.md
+```
+
+Frontmatter for group `index.md`:
+```yaml
+---
+title: NYC Yellow Taxi    # ← sidebar group label
+sidebar_position: 1       # ← group order among all top-level items
+---
+```
+
+---
+
+## Known Pitfalls — Do Not Repeat
+
+| # | Wrong | Correct | Component |
+|---|---|---|---|
+| 1 | `{inputs.x.value}` | `{inputs.x}` | ButtonGroup / Slider |
+| 2 | `{inputs.x}` | `{inputs.x.value}` | Dropdown (single) |
+| 3 | `IN '${inputs.x.value}'` | `IN ${inputs.x.value}` | Dropdown multi |
+| 4 | `IN ${inputs.x}` | `IN ${inputs.x.value}` | Dropdown multi |
+| 5 | `year >= '${inputs.dr.start}'` | `year >= YEAR(CAST('${inputs.dr.start}' AS DATE))` | DateRange + INT year |
+| 6 | `year('${inputs.dr.start}')` | `YEAR(CAST('${inputs.dr.start}' AS DATE))` | DateRange + INT year |
+| 7 | `{#if inputs.x.value === ...}` | `{#if inputs.x === ...}` | ButtonGroup |
+| 8 | `<BigValue agg=sum/>` | Aggregate in SQL | BigValue |
+| 9 | `long=longitude` (when col is `lon`) | `long=lon` | PointMap |
+| 10 | `FROM read_parquet('/abs/path')` | `FROM read_parquet('sources/name/file')` | Source SQL |
+| 11 | `FROM (SELECT * WHERE ...) USING SAMPLE` | `FROM (subquery) USING SAMPLE N ROWS` | DuckDB WASM |
+| 12 | Cross-source refs in source SQL | Join in page SQL instead | Source SQL |
+| 13 | `x="month"` (quoted) | `x=month` (bare) | All chart components |

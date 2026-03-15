@@ -33,11 +33,11 @@ select * from world_energy.country_time_series
 
 ```sql global_filtered
 select * from ${global}
-where year >= year('${inputs.year_range.start}')
-  and year <= year('${inputs.year_range.end}')
+where year >= YEAR(CAST('${inputs.year_range.start}' AS DATE))
+  and year <= YEAR(CAST('${inputs.year_range.end}' AS DATE))
 ```
 
-{#if inputs.view_mode.value === 'shares'}
+{#if inputs.view_mode === 'shares'}
 <AreaChart
   data={global_filtered}
   x=year
@@ -92,17 +92,17 @@ where year >= year('${inputs.year_range.start}')
 ```sql country_filtered
 select * from ${timeseries}
 where country in ${inputs.countries.value}
-  and year >= year('${inputs.year_range.start}')
-  and year <= year('${inputs.year_range.end}')
+  and year >= YEAR(CAST('${inputs.year_range.start}' AS DATE))
+  and year <= YEAR(CAST('${inputs.year_range.end}' AS DATE))
 ```
 
 <LineChart
   data={country_filtered}
   x=year
-  y={inputs.country_metric.value}
+  y={inputs.country_metric}
   series=country
-  title="{inputs.country_metric.value} by Country"
-  yAxisTitle={inputs.country_metric.value}
+  title="{inputs.country_metric} by Country"
+  yAxisTitle={inputs.country_metric}
   markers=false
 />
 

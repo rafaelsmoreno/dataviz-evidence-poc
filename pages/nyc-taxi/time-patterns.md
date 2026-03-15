@@ -34,8 +34,8 @@ select * from nyc_taxi.daily_trips
   data={hourly}
   x=hour_of_day
   y=day_name
-  value={inputs.heatmap_metric.value}
-  title="Heatmap: {inputs.heatmap_metric.value} by Day & Hour"
+  value={inputs.heatmap_metric}
+  title="Heatmap: {inputs.heatmap_metric} by Day & Hour"
   xAxisTitle="Hour of Day (0–23)"
   yAxisTitle="Day of Week"
 />

@@ -45,15 +45,15 @@ select * from ${macro} order by year desc limit 1
 
 ```sql macro_filtered
 select * from ${macro}
-where year >= year('${inputs.year_range.start}')
-  and year <= year('${inputs.year_range.end}')
+where year >= YEAR(CAST('${inputs.year_range.start}' AS DATE))
+  and year <= YEAR(CAST('${inputs.year_range.end}' AS DATE))
 ```
 
 <LineChart
   data={macro_filtered}
   x=year
-  y={inputs.gdp_view.value}
-  title="Brazil GDP — {inputs.gdp_view.value}"
+  y={inputs.gdp_view}
+  title="Brazil GDP — {inputs.gdp_view}"
   yAxisTitle="USD"
   markers=true
 />
